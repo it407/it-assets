@@ -1,0 +1,22 @@
+# utils/constants.py
+
+# Sheet names
+USERS_SHEET = "user_access"
+ASSETS_MASTER_SHEET = "assets_master"
+ASSET_ASSIGNMENTS_SHEET = "asset_assignments"
+SUBSCRIPTIONS_MASTER_SHEET = "subscriptions_master"
+SUBSCRIPTION_ASSIGNMENTS_SHEET = "subscription_assignments"
+
+# Roles
+ROLE_ADMIN = "Admin"
+ROLE_USER = "User"
+ROLE_MANAGER = "Manager"
+
+
+# Asset assignment status
+ASSET_ASSIGNED = "Assigned"
+ASSET_RETURNED = "Returned"
+
+# Subscription assignment status
+SUB_ACTIVE = "Active"
+SUB_INACTIVE = "Inactive"
