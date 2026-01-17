@@ -3,7 +3,7 @@
 import streamlit as st
 from utils.auth import login
 from utils.constants import ROLE_ADMIN
-from utils.constants import ROLE_ADMIN, ROLE_MANAGER
+from utils.constants import ROLE_ADMIN, ROLE_MANAGER, ROLE_HR
 import streamlit as st
 
 def login_required():
