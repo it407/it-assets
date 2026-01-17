@@ -59,9 +59,15 @@ role = user["role"]
 # ─────────────────────────────────────────────
 # 🔁 EARLY ROLE REDIRECT (CRITICAL)
 # ─────────────────────────────────────────────
+if role == ROLE_HR and not st.session_state.get("_hr_redirect"):
+    st.session_state["_hr_redirect"] = True
+    st.switch_page("pages/11_Attendance_Dashboard.py")
+    st.stop()
+
 if role == ROLE_USER and not st.session_state.get("_user_redirect"):
     st.session_state["_user_redirect"] = True
     st.switch_page("pages/5_My_Assets.py")
+    st.stop()
 
 # ─────────────────────────────────────────────
 # Sidebar (AFTER redirect)
