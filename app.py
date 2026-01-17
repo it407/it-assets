@@ -3,7 +3,7 @@
 import streamlit as st
 from utils.permissions import login_required
 from utils.auth import logout
-from utils.constants import ROLE_ADMIN, ROLE_MANAGER, ROLE_USER
+from utils.constants import ROLE_ADMIN, ROLE_MANAGER, ROLE_USER, ROLE_HR
 
 # ─────────────────────────────────────────────
 # Page config
