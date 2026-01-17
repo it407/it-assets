@@ -11,7 +11,7 @@ SUBSCRIPTION_ASSIGNMENTS_SHEET = "subscription_assignments"
 ROLE_ADMIN = "Admin"
 ROLE_USER = "User"
 ROLE_MANAGER = "Manager"
-
+ROLE_HR = "Hr"
 
 # Asset assignment status
 ASSET_ASSIGNED = "Assigned"

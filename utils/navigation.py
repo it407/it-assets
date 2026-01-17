@@ -1,7 +1,7 @@
 # utils/navigation.py
 
 import streamlit as st
-from utils.constants import ROLE_ADMIN, ROLE_MANAGER, ROLE_USER
+from utils.constants import ROLE_ADMIN, ROLE_MANAGER, ROLE_USER, ROLE_HR
 
 def apply_role_based_navigation():
     user = st.session_state.get("user")
@@ -46,6 +46,23 @@ def apply_role_based_navigation():
             }
 
             [data-testid="stSidebarNav"] a[aria-label="My Assets"] {
+                display: block !important;
+            }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    # 👤 User → My Assets only
+    if role == ROLE_HR:
+        st.markdown(
+            """
+            <style>
+            [data-testid="stSidebarNav"] li {
+                display: none;
+            }
+
+            [data-testid="stSidebarNav"] a[aria-label="Attendance Dashboard"] {
                 display: block !important;
             }
             </style>
