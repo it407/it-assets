@@ -3,7 +3,9 @@ import pandas as pd
 
 from utils.permissions import hr_only
 from utils.auth import logout
-
+from utils.ui import apply_global_ui
+from utils.navigation import apply_role_based_navigation
+apply_global_ui()
 # ─────────────────────────────────────────────
 # Global UI + Security
 # ─────────────────────────────────────────────
