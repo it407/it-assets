@@ -38,7 +38,7 @@ for df in dfs:
         df.columns = df.columns.str.strip().str.lower()
 
 # ─────────────────────────────────────────────
-# DuckDB
+# DuckDB joins
 # ─────────────────────────────────────────────
 con = duckdb.connect(database=":memory:")
 
@@ -49,9 +49,9 @@ con.register("software_master", software_master_df)
 con.register("employee", employee_df)
 
 # ─────────────────────────────────────────────
-# ASSETS QUERY
+# Assets query
 # ─────────────────────────────────────────────
-asset_query = """
+asset_df = con.execute("""
 SELECT
     e.employee_id,
     e.employee_name,
@@ -65,14 +65,12 @@ FROM asset_assign a
 JOIN asset_master am ON a.asset_id = am.asset_id
 JOIN employee e ON a.employee_id = e.employee_id
 WHERE a.assignment_status = 'Assigned'
-"""
-
-asset_df = con.execute(asset_query).df()
+""").df()
 
 # ─────────────────────────────────────────────
-# SOFTWARE QUERY
+# Software query
 # ─────────────────────────────────────────────
-software_query = """
+software_df = con.execute("""
 SELECT
     e.employee_id,
     e.employee_name,
@@ -86,9 +84,7 @@ FROM software_assign s
 JOIN software_master sm ON s.soft_id = sm.soft_id
 JOIN employee e ON s.employee_id = e.employee_id
 WHERE s.assignment_status = 'Assigned'
-"""
-
-software_df = con.execute(software_query).df()
+""").df()
 
 # ─────────────────────────────────────────────
 # Filters
@@ -101,38 +97,27 @@ with col1:
     search = st.text_input("Search Employee (ID / Name)")
 
 with col2:
-    dept = st.selectbox(
+    dept_filter = st.selectbox(
         "Department",
         ["All"] + sorted(
-            set(
-                pd.concat(
-                    [
-                        asset_df["department"],
-                        software_df["department"],
-                    ],
-                    ignore_index=True,
-                ).dropna()
-            )
-        ),
+            pd.concat(
+                [asset_df["department"], software_df["department"]],
+                ignore_index=True
+            ).dropna().unique().tolist()
+        )
     )
 
 with col3:
-    location = st.selectbox(
+    location_filter = st.selectbox(
         "Location",
         ["All"] + sorted(
-            set(
-                pd.concat(
-                    [
-                        asset_df["location"],
-                        software_df["location"],
-                    ],
-                    ignore_index=True,
-                ).dropna()
-            )
-        ),
+            pd.concat(
+                [asset_df["location"], software_df["location"]],
+                ignore_index=True
+            ).dropna().unique().tolist()
+        )
     )
 
-# Apply filters
 def apply_filters(df):
     if search:
         df = df[
@@ -140,20 +125,19 @@ def apply_filters(df):
             | df["employee_name"].str.contains(search, case=False, na=False)
         ]
 
-    if dept != "All":
-        df = df[df["department"] == dept]
+    if dept_filter != "All":
+        df = df[df["department"] == dept_filter]
 
-    if location != "All":
-        df = df[df["location"] == location]
+    if location_filter != "All":
+        df = df[df["location"] == location_filter]
 
     return df
-
 
 asset_df = apply_filters(asset_df)
 software_df = apply_filters(software_df)
 
 # ─────────────────────────────────────────────
-# ASSETS SECTION
+# Assets table
 # ─────────────────────────────────────────────
 st.divider()
 st.subheader("🖥️ Assigned Assets")
@@ -174,11 +158,11 @@ else:
                 "assigned_on",
             ]
         ].sort_values("assigned_on", ascending=False),
-        use_container_width=True,
+        use_container_width=True
     )
 
 # ─────────────────────────────────────────────
-# SOFTWARE SECTION (WITH OPEN + COPY)
+# Software table-style view
 # ─────────────────────────────────────────────
 st.divider()
 st.subheader("💻 Assigned Software")
@@ -186,29 +170,41 @@ st.subheader("💻 Assigned Software")
 if software_df.empty:
     st.info("No assigned software found.")
 else:
+    # Header row
+    h1, h2, h3, h4, h5, h6, h7, h8, h9 = st.columns(
+        [1.2, 2, 1.2, 2.5, 1.5, 1.5, 1.2, 1.2, 1]
+    )
+    h1.markdown("**Emp ID**")
+    h2.markdown("**Employee**")
+    h3.markdown("**Soft ID**")
+    h4.markdown("**Software Name**")
+    h5.markdown("**Department**")
+    h6.markdown("**Location**")
+    h7.markdown("**Assigned On**")
+    h8.markdown("**Open**")
+    h9.markdown("**Copy**")
+
     for i, row in software_df.sort_values(
         "assigned_on", ascending=False
     ).iterrows():
 
-        with st.container():
-            col1, col2, col3 = st.columns([6, 1, 1])
+        c1, c2, c3, c4, c5, c6, c7, c8, c9 = st.columns(
+            [1.2, 2, 1.2, 2.5, 1.5, 1.5, 1.2, 1.2, 1]
+        )
 
-            with col1:
-                st.markdown(
-                    f"""
-                    **{row['soft_name']}**  
-                    `{row['soft_id']}`  
-                    👤 {row['employee_name']} ({row['employee_id']})  
-                    📍 {row['location']} | 🏢 {row['department']}
-                    """
-                )
+        c1.write(row["employee_id"])
+        c2.write(row["employee_name"])
+        c3.write(row["soft_id"])
+        c4.write(row["soft_name"])
+        c5.write(row["department"])
+        c6.write(row["location"])
+        c7.write(row["assigned_on"])
 
-            with col2:
-                if row["links"]:
-                    st.link_button("🌐 Open", row["links"])
-
-            with col3:
-                if row["links"]:
-                    if st.button("📋 Copy", key=f"copy_{i}"):
-                        st.code(row["links"])
-                        st.toast("Link ready to copy")
+        if row["links"]:
+            c8.link_button("Open", row["links"])
+            if c9.button("Copy", key=f"copy_{i}"):
+                st.code(row["links"])
+                st.toast("Link ready to copy")
+        else:
+            c8.write("-")
+            c9.write("-")
