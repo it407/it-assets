@@ -21,7 +21,7 @@ admin_or_manager_only()
 logout()
 
 # ─────────────────────────────────────────────
-# Back to Dashboard Hub
+# Back to Dashboard
 # ─────────────────────────────────────────────
 if st.button("⬅ Back to Dashboard"):
     st.switch_page("app.py")
@@ -44,15 +44,21 @@ for df in [assign_df, software_df, employees_df]:
     if not df.empty:
         df.columns = df.columns.str.strip().str.lower()
 
-# Keep only ACTIVE assignments
-assign_df = assign_df[assign_df["status"] == "Active"]
+# ─────────────────────────────────────────────
+# Keep only ACTIVE ASSIGNMENTS
+# (assigned but not yet returned)
+# ─────────────────────────────────────────────
+if "unassigned_on" in assign_df.columns:
+    assign_df = assign_df[assign_df["unassigned_on"].isna()]
+elif "returned_on" in assign_df.columns:
+    assign_df = assign_df[assign_df["returned_on"].isna()]
 
 if assign_df.empty:
     st.info("No active software assignments.")
     st.stop()
 
 # ─────────────────────────────────────────────
-# DuckDB JOIN (SAFE & EXPLICIT)
+# DuckDB JOIN (explicit & safe)
 # ─────────────────────────────────────────────
 con = duckdb.connect(database=":memory:")
 
@@ -66,6 +72,7 @@ SELECT
     e.employee_name,
     a.soft_id,
     s.soft_name,
+    s.status,
     e.department,
     e.location,
     a.assigned_on,
@@ -82,6 +89,19 @@ result_df = con.execute(query).df()
 
 if result_df.empty:
     st.info("No assigned software records.")
+    st.stop()
+
+# ─────────────────────────────────────────────
+# Keep ONLY ACTIVE SOFTWARE
+# (Paused / Expired hidden)
+# ─────────────────────────────────────────────
+if "status" in result_df.columns:
+    result_df = result_df[
+        result_df["status"].astype(str).str.lower() == "active"
+    ]
+
+if result_df.empty:
+    st.info("No active software available.")
     st.stop()
 
 # ─────────────────────────────────────────────
@@ -109,7 +129,7 @@ with col3:
     )
 
 with col4:
-    soft_filter = st.multiselect(
+    software_filter = st.multiselect(
         "Software",
         sorted(result_df["soft_name"].dropna().unique()),
         default=sorted(result_df["soft_name"].dropna().unique()),
@@ -126,11 +146,11 @@ if emp_search:
 filtered_df = filtered_df[
     filtered_df["department"].isin(dept_filter)
     & filtered_df["location"].isin(location_filter)
-    & filtered_df["soft_name"].isin(soft_filter)
+    & filtered_df["soft_name"].isin(software_filter)
 ]
 
 # ─────────────────────────────────────────────
-# Software Table (HTML – Reusable)
+# Render Software Table (HTML – Reusable)
 # ─────────────────────────────────────────────
 render_html_table(
     df=filtered_df,
