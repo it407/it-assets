@@ -1,88 +1,94 @@
 import streamlit as st
-import pandas as pd
 import duckdb
+import pandas as pd
 
 from utils.permissions import admin_or_manager_only
 from utils.gsheets import read_sheet
 from utils.ui import apply_global_ui
 from utils.auth import logout
 
+# ─────────────────────────────────────────────
+# Security & UI
+# ─────────────────────────────────────────────
 apply_global_ui()
 admin_or_manager_only()
 logout()
 
-st.title("👤 User-wise Assigned Assets & Software")
+st.title("👤 User Assigned Assets & Software")
 
 # ─────────────────────────────────────────────
 # Load data
 # ─────────────────────────────────────────────
-assets_assign_df = read_sheet("asset_assignments")
-assets_master_df = read_sheet("assets_master")
+asset_assign_df = read_sheet("asset_assignments")
+asset_master_df = read_sheet("assets_master")
 software_assign_df = read_sheet("software_assignments")
-employees_df = read_sheet("employee_master")
+software_master_df = read_sheet("software_master")
+employee_df = read_sheet("employee_master")
 
-dfs = [assets_assign_df, assets_master_df, software_assign_df, employees_df]
+dfs = [
+    asset_assign_df,
+    asset_master_df,
+    software_assign_df,
+    software_master_df,
+    employee_df,
+]
+
 for df in dfs:
     if not df.empty:
         df.columns = df.columns.str.strip().str.lower()
 
-# Guard
-if assets_assign_df.empty and software_assign_df.empty:
-    st.info("No asset or software assignments found.")
-    st.stop()
-
 # ─────────────────────────────────────────────
-# DuckDB joins
+# DuckDB
 # ─────────────────────────────────────────────
 con = duckdb.connect(database=":memory:")
 
-con.register("asset_assign", assets_assign_df)
-con.register("asset_master", assets_master_df)
+con.register("asset_assign", asset_assign_df)
+con.register("asset_master", asset_master_df)
 con.register("software_assign", software_assign_df)
-con.register("employees", employees_df)
+con.register("software_master", software_master_df)
+con.register("employee", employee_df)
 
-query = """
--- ASSETS
+# ─────────────────────────────────────────────
+# ASSETS QUERY
+# ─────────────────────────────────────────────
+asset_query = """
 SELECT
     e.employee_id,
     e.employee_name,
-    'Asset' AS assignment_type,
-    a.asset_id,
+    am.asset_id,
     am.asset_name,
-    NULL AS soft_id,
-    NULL AS soft_name,
+    am.category,
     am.location,
     e.department,
     a.assigned_on
 FROM asset_assign a
-JOIN employees e ON a.employee_id = e.employee_id
 JOIN asset_master am ON a.asset_id = am.asset_id
+JOIN employee e ON a.employee_id = e.employee_id
 WHERE a.assignment_status = 'Assigned'
+"""
 
-UNION ALL
+asset_df = con.execute(asset_query).df()
 
--- SOFTWARE
+# ─────────────────────────────────────────────
+# SOFTWARE QUERY
+# ─────────────────────────────────────────────
+software_query = """
 SELECT
     e.employee_id,
     e.employee_name,
-    'Software' AS assignment_type,
-    NULL AS asset_id,
-    NULL AS asset_name,
-    s.soft_id,
-    s.soft_name,
+    sm.soft_id,
+    sm.soft_name,
+    sm.links,
     e.location,
     e.department,
     s.assigned_on
 FROM software_assign s
-JOIN employees e ON s.employee_id = e.employee_id
+JOIN software_master sm ON s.soft_id = sm.soft_id
+JOIN employee e ON s.employee_id = e.employee_id
 WHERE s.assignment_status = 'Assigned'
 """
 
-result_df = con.execute(query).df()
-
-if result_df.empty:
-    st.info("No active assignments found.")
-    st.stop()
+software_df = con.execute(software_query).df()
 
 # ─────────────────────────────────────────────
 # Filters
@@ -95,62 +101,114 @@ with col1:
     search = st.text_input("Search Employee (ID / Name)")
 
 with col2:
-    dept_filter = st.selectbox(
+    dept = st.selectbox(
         "Department",
-        ["All"] + sorted(result_df["department"].dropna().unique().tolist())
+        ["All"] + sorted(
+            set(
+                pd.concat(
+                    [
+                        asset_df["department"],
+                        software_df["department"],
+                    ],
+                    ignore_index=True,
+                ).dropna()
+            )
+        ),
     )
 
 with col3:
-    loc_filter = st.selectbox(
+    location = st.selectbox(
         "Location",
-        ["All"] + sorted(result_df["location"].dropna().unique().tolist())
+        ["All"] + sorted(
+            set(
+                pd.concat(
+                    [
+                        asset_df["location"],
+                        software_df["location"],
+                    ],
+                    ignore_index=True,
+                ).dropna()
+            )
+        ),
     )
 
 # Apply filters
-filtered_df = result_df.copy()
+def apply_filters(df):
+    if search:
+        df = df[
+            df["employee_id"].str.contains(search, case=False, na=False)
+            | df["employee_name"].str.contains(search, case=False, na=False)
+        ]
 
-if search:
-    filtered_df = filtered_df[
-        filtered_df["employee_id"].str.contains(search, case=False, na=False)
-        | filtered_df["employee_name"].str.contains(search, case=False, na=False)
-    ]
+    if dept != "All":
+        df = df[df["department"] == dept]
 
-if dept_filter != "All":
-    filtered_df = filtered_df[filtered_df["department"] == dept_filter]
+    if location != "All":
+        df = df[df["location"] == location]
 
-if loc_filter != "All":
-    filtered_df = filtered_df[filtered_df["location"] == loc_filter]
+    return df
 
-# ─────────────────────────────────────────────
-# Display
-# ─────────────────────────────────────────────
-st.subheader("📋 Assigned Assets & Software")
 
-display_cols = [
-    "employee_id",
-    "employee_name",
-    "assignment_type",
-    "asset_id",
-    "asset_name",
-    "soft_id",
-    "soft_name",
-    "location",
-    "department",
-    "assigned_on",
-]
-
-st.dataframe(
-    filtered_df[display_cols]
-    .sort_values("assigned_on", ascending=False),
-    use_container_width=True,
-)
+asset_df = apply_filters(asset_df)
+software_df = apply_filters(software_df)
 
 # ─────────────────────────────────────────────
-# Export
+# ASSETS SECTION
 # ─────────────────────────────────────────────
-st.download_button(
-    "⬇ Download CSV",
-    data=filtered_df[display_cols].to_csv(index=False),
-    file_name="user_assigned_assets_software.csv",
-    mime="text/csv",
-)
+st.divider()
+st.subheader("🖥️ Assigned Assets")
+
+if asset_df.empty:
+    st.info("No assigned assets found.")
+else:
+    st.dataframe(
+        asset_df[
+            [
+                "employee_id",
+                "employee_name",
+                "asset_id",
+                "asset_name",
+                "category",
+                "location",
+                "department",
+                "assigned_on",
+            ]
+        ].sort_values("assigned_on", ascending=False),
+        use_container_width=True,
+    )
+
+# ─────────────────────────────────────────────
+# SOFTWARE SECTION (WITH OPEN + COPY)
+# ─────────────────────────────────────────────
+st.divider()
+st.subheader("💻 Assigned Software")
+
+if software_df.empty:
+    st.info("No assigned software found.")
+else:
+    for i, row in software_df.sort_values(
+        "assigned_on", ascending=False
+    ).iterrows():
+
+        with st.container():
+            col1, col2, col3 = st.columns([6, 1, 1])
+
+            with col1:
+                st.markdown(
+                    f"""
+                    **{row['soft_name']}**  
+                    `{row['soft_id']}`  
+                    👤 {row['employee_name']} ({row['employee_id']})  
+                    📍 {row['location']} | 🏢 {row['department']}
+                    """
+                )
+
+            with col2:
+                if row["links"]:
+                    st.link_button("🌐 Open", row["links"])
+
+            with col3:
+                if row["links"]:
+                    if st.button("📋 Copy", key=f"copy_{i}"):
+                        st.code(row["links"])
+                        st.toast("Link ready to copy")
