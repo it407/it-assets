@@ -83,12 +83,11 @@ con.register("employees", employees_df)
 
 query = """
 SELECT
-    a.assignment_id,
+    a.employee_id,
+    a.employee_name,
     a.asset_id,
     am.asset_name,
     am.category,
-    a.employee_id,
-    a.employee_name,
     e.department,
     e.location,
     a.assigned_on
