@@ -4,7 +4,6 @@ from datetime import datetime
 
 from utils.permissions import login_required, admin_only
 from utils.gsheets import read_sheet, append_row
-from utils.permissions import admin_only
 
 from utils.ui import apply_global_ui
 apply_global_ui()
@@ -17,7 +16,7 @@ apply_role_based_navigation()
 from utils.auth import logout
 logout()
 
-st.title("cctv wifi Credential")
+st.title("CCTV / Wi-Fi Credential")
 
 SHEET_NAME = "cctv_wifi_credential"
 
@@ -29,24 +28,46 @@ if not cred_df.empty:
     cred_df.columns = cred_df.columns.str.strip().str.lower()
 
 # ─────────────────────────────────────────────
+# Dropdown values from existing data (SAFE)
+# ─────────────────────────────────────────────
+location_options = (
+    sorted(cred_df["location"].dropna().unique().tolist())
+    if not cred_df.empty and "location" in cred_df.columns
+    else []
+)
+
+device_type_options = (
+    sorted(cred_df["device_type"].dropna().unique().tolist())
+    if not cred_df.empty and "device_type" in cred_df.columns
+    else []
+)
+
+# Fallback values (first entry case)
+if not location_options:
+    location_options = ["HO", "Branch 1", "Branch 2", "Warehouse"]
+
+if not device_type_options:
+    device_type_options = [
+        "WiFi Router",
+        "CCTV Camera",
+        "NVR / DVR",
+        "Switch",
+        "Other"
+    ]
+
+# ─────────────────────────────────────────────
 # Submission form
 # ─────────────────────────────────────────────
 with st.form("cctv_wifi_form"):
     col1, col2 = st.columns(2)
 
     with col1:
-        location = st.selectbox(
-            "Location *",
-            ["HO", "Branch 1", "Branch 2", "Warehouse", "Other"]
-        )
+        location = st.selectbox("Location *", location_options)
 
-        device_type = st.selectbox(
-            "Device Type *",
-            ["WiFi Router", "CCTV Camera", "NVR / DVR", "Switch", "Other"]
-        )
+        device_type = st.selectbox("Device Type *", device_type_options)
 
-        ssid = st.text_input("SSID / Device Name")      # optional
-        ss_password = st.text_input("SSID Password")    # optional
+        ssid = st.text_input("SSID / Device Name")          # optional
+        ss_password = st.text_input("SSID Password")        # optional
 
     with col2:
         username = st.text_input("Username")
@@ -58,7 +79,7 @@ with st.form("cctv_wifi_form"):
     submit = st.form_submit_button("➕ Save Credential")
 
 # ─────────────────────────────────────────────
-# Submit logic (MINIMAL CHANGE ONLY)
+# Submit logic (MINIMAL VALIDATION)
 # ─────────────────────────────────────────────
 if submit:
     if not location or not device_type:
@@ -85,7 +106,7 @@ if submit:
     st.rerun()
 
 # ─────────────────────────────────────────────
-# Table view + CSV
+# Table view + CSV export
 # ─────────────────────────────────────────────
 st.divider()
 st.subheader("📋 Stored CCTV / Wi-Fi Credentials")
