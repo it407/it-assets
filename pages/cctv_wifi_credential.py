@@ -35,13 +35,18 @@ with st.form("cctv_wifi_form"):
     col1, col2 = st.columns(2)
 
     with col1:
-        location = st.text_input("Location *")
+        location = st.selectbox(
+            "Location *",
+            ["HO", "Branch 1", "Branch 2", "Warehouse", "Other"]
+        )
+
         device_type = st.selectbox(
             "Device Type *",
             ["WiFi Router", "CCTV Camera", "NVR / DVR", "Switch", "Other"]
         )
-        ssid = st.text_input("SSID / Device Name *")
-        ss_password = st.text_input("SSID Password *")
+
+        ssid = st.text_input("SSID / Device Name")      # optional
+        ss_password = st.text_input("SSID Password")    # optional
 
     with col2:
         username = st.text_input("Username")
@@ -53,11 +58,11 @@ with st.form("cctv_wifi_form"):
     submit = st.form_submit_button("➕ Save Credential")
 
 # ─────────────────────────────────────────────
-# Submit logic (NO logic change)
+# Submit logic (MINIMAL CHANGE ONLY)
 # ─────────────────────────────────────────────
 if submit:
     if not location or not device_type:
-        st.error("Location, Device Type are required.")
+        st.error("Location and Device Type are required.")
         st.stop()
 
     append_row(
