@@ -1,5 +1,4 @@
 import streamlit as st
-import pandas as pd
 from datetime import datetime
 
 from utils.permissions import admin_only
@@ -25,26 +24,20 @@ if not cred_df.empty:
     cred_df.columns = cred_df.columns.str.strip().str.lower()
 
 # ─────────────────────────────────────────────
-# Dropdown values from existing data
+# Build dropdown values from table
 # ─────────────────────────────────────────────
-location_options = (
-    sorted(cred_df["location"].dropna().unique().tolist())
-    if not cred_df.empty and "location" in cred_df.columns
-    else []
-)
+location_values = []
+device_type_values = []
 
-device_type_options = (
-    sorted(cred_df["device_type"].dropna().unique().tolist())
-    if not cred_df.empty and "device_type" in cred_df.columns
-    else []
-)
+if not cred_df.empty:
+    if "location" in cred_df.columns:
+        location_values = sorted(cred_df["location"].dropna().unique().tolist())
+    if "device_type" in cred_df.columns:
+        device_type_values = sorted(cred_df["device_type"].dropna().unique().tolist())
 
-# Always allow "Other"
-if "Other" not in location_options:
-    location_options.append("Other")
-
-if "Other" not in device_type_options:
-    device_type_options.append("Other")
+# Append "Other" ONLY as option
+location_options = location_values + ["Other"]
+device_type_options = device_type_values + ["Other"]
 
 # ─────────────────────────────────────────────
 # Submission form
@@ -53,22 +46,22 @@ with st.form("cctv_wifi_form"):
     col1, col2 = st.columns(2)
 
     with col1:
-        location_choice = st.selectbox("Location *", location_options)
-        location_other = (
+        selected_location = st.selectbox("Location *", location_options)
+        custom_location = (
             st.text_input("Enter Location")
-            if location_choice == "Other"
-            else ""
+            if selected_location == "Other"
+            else None
         )
 
-        device_type_choice = st.selectbox("Device Type *", device_type_options)
-        device_type_other = (
+        selected_device_type = st.selectbox("Device Type *", device_type_options)
+        custom_device_type = (
             st.text_input("Enter Device Type")
-            if device_type_choice == "Other"
-            else ""
+            if selected_device_type == "Other"
+            else None
         )
 
-        ssid = st.text_input("SSID / Device Name")        # optional
-        ss_password = st.text_input("SSID Password")      # optional
+        ssid = st.text_input("SSID / Device Name")
+        ss_password = st.text_input("SSID Password")
 
     with col2:
         username = st.text_input("Username")
@@ -80,35 +73,37 @@ with st.form("cctv_wifi_form"):
     submit = st.form_submit_button("➕ Save Credential")
 
 # ─────────────────────────────────────────────
-# Submit logic
+# Submit logic (THIS IS THE IMPORTANT PART)
 # ─────────────────────────────────────────────
 if submit:
     final_location = (
-        location_other.strip()
-        if location_choice == "Other"
-        else location_choice
+        custom_location.strip()
+        if selected_location == "Other"
+        else selected_location
     )
 
     final_device_type = (
-        device_type_other.strip()
-        if device_type_choice == "Other"
-        else device_type_choice
+        custom_device_type.strip()
+        if selected_device_type == "Other"
+        else selected_device_type
     )
 
+    # Validation
     if not final_location or not final_device_type:
         st.error("Location and Device Type are required.")
         st.stop()
 
+    # ❗ "Other" IS NEVER SAVED ❗
     append_row(
         SHEET_NAME,
         {
+            "location": final_location,
             "device_type": final_device_type,
             "username": username,
             "password": password,
             "ip_add": ip_add,
             "ssid": ssid,
             "ss_password": ss_password,
-            "location": final_location,
             "mac": mac,
             "remarks": remarks,
             "created_at": datetime.now().isoformat(),
@@ -119,7 +114,7 @@ if submit:
     st.rerun()
 
 # ─────────────────────────────────────────────
-# Table view + CSV export
+# Table view + CSV
 # ─────────────────────────────────────────────
 st.divider()
 st.subheader("📋 Stored CCTV / Wi-Fi Credentials")
@@ -127,17 +122,12 @@ st.subheader("📋 Stored CCTV / Wi-Fi Credentials")
 if cred_df.empty:
     st.info("No credentials found.")
 else:
-    display_df = (
-        cred_df.sort_values("created_at", ascending=False)
-        if "created_at" in cred_df.columns
-        else cred_df
-    )
-
+    display_df = cred_df.sort_values("created_at", ascending=False)
     st.dataframe(display_df, use_container_width=True)
 
     st.download_button(
         "⬇ Download CSV",
-        data=display_df.to_csv(index=False).encode("utf-8"),
+        data=display_df.to_csv(index=False),
         file_name="cctv_wifi_credentials.csv",
         mime="text/csv"
     )
