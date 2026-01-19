@@ -2,18 +2,15 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 
-from utils.permissions import login_required, admin_only
+from utils.permissions import admin_only
 from utils.gsheets import read_sheet, append_row
-
 from utils.ui import apply_global_ui
-apply_global_ui()
-
-admin_only()
-
 from utils.navigation import apply_role_based_navigation
-apply_role_based_navigation()
-
 from utils.auth import logout
+
+apply_global_ui()
+admin_only()
+apply_role_based_navigation()
 logout()
 
 st.title("CCTV / Wi-Fi Credential")
@@ -28,7 +25,7 @@ if not cred_df.empty:
     cred_df.columns = cred_df.columns.str.strip().str.lower()
 
 # ─────────────────────────────────────────────
-# Dropdown values from existing data (SAFE)
+# Dropdown values from existing data
 # ─────────────────────────────────────────────
 location_options = (
     sorted(cred_df["location"].dropna().unique().tolist())
@@ -42,18 +39,12 @@ device_type_options = (
     else []
 )
 
-# Fallback values (first entry case)
-if not location_options:
-    location_options = ["HO", "Branch 1", "Branch 2", "Warehouse"]
+# Always allow "Other"
+if "Other" not in location_options:
+    location_options.append("Other")
 
-if not device_type_options:
-    device_type_options = [
-        "WiFi Router",
-        "CCTV Camera",
-        "NVR / DVR",
-        "Switch",
-        "Other"
-    ]
+if "Other" not in device_type_options:
+    device_type_options.append("Other")
 
 # ─────────────────────────────────────────────
 # Submission form
@@ -62,12 +53,22 @@ with st.form("cctv_wifi_form"):
     col1, col2 = st.columns(2)
 
     with col1:
-        location = st.selectbox("Location *", location_options)
+        location_choice = st.selectbox("Location *", location_options)
+        location_other = (
+            st.text_input("Enter Location")
+            if location_choice == "Other"
+            else ""
+        )
 
-        device_type = st.selectbox("Device Type *", device_type_options)
+        device_type_choice = st.selectbox("Device Type *", device_type_options)
+        device_type_other = (
+            st.text_input("Enter Device Type")
+            if device_type_choice == "Other"
+            else ""
+        )
 
-        ssid = st.text_input("SSID / Device Name")          # optional
-        ss_password = st.text_input("SSID Password")        # optional
+        ssid = st.text_input("SSID / Device Name")        # optional
+        ss_password = st.text_input("SSID Password")      # optional
 
     with col2:
         username = st.text_input("Username")
@@ -79,23 +80,35 @@ with st.form("cctv_wifi_form"):
     submit = st.form_submit_button("➕ Save Credential")
 
 # ─────────────────────────────────────────────
-# Submit logic (MINIMAL VALIDATION)
+# Submit logic
 # ─────────────────────────────────────────────
 if submit:
-    if not location or not device_type:
+    final_location = (
+        location_other.strip()
+        if location_choice == "Other"
+        else location_choice
+    )
+
+    final_device_type = (
+        device_type_other.strip()
+        if device_type_choice == "Other"
+        else device_type_choice
+    )
+
+    if not final_location or not final_device_type:
         st.error("Location and Device Type are required.")
         st.stop()
 
     append_row(
         SHEET_NAME,
         {
-            "device_type": device_type,
+            "device_type": final_device_type,
             "username": username,
             "password": password,
             "ip_add": ip_add,
             "ssid": ssid,
             "ss_password": ss_password,
-            "location": location,
+            "location": final_location,
             "mac": mac,
             "remarks": remarks,
             "created_at": datetime.now().isoformat(),
