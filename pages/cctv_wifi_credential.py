@@ -6,6 +6,9 @@ from utils.gsheets import read_sheet, append_row
 from utils.ui import apply_global_ui
 from utils.auth import logout
 
+# ─────────────────────────────────────────────
+# Security + UI
+# ─────────────────────────────────────────────
 apply_global_ui()
 admin_only()
 logout()
@@ -15,14 +18,14 @@ st.title("CCTV / Wi-Fi Credential")
 SHEET_NAME = "cctv_wifi_credential"
 
 # ─────────────────────────────────────────────
-# Load existing credentials
+# Load existing data
 # ─────────────────────────────────────────────
 cred_df = read_sheet(SHEET_NAME)
 if not cred_df.empty:
     cred_df.columns = cred_df.columns.str.strip().str.lower()
 
 # ─────────────────────────────────────────────
-# Build dropdown lists safely (with fallback + Other)
+# Build dropdown options from table
 # ─────────────────────────────────────────────
 location_values = []
 device_type_values = []
@@ -30,46 +33,63 @@ device_type_values = []
 if not cred_df.empty:
     if "location" in cred_df.columns:
         location_values = sorted(
-            [x for x in cred_df["location"].dropna().astype(str).str.strip().tolist() if x]
+            set(
+                cred_df["location"]
+                .dropna()
+                .astype(str)
+                .str.strip()
+                .tolist()
+            )
         )
-        location_values = sorted(list(set(location_values)))
 
     if "device_type" in cred_df.columns:
         device_type_values = sorted(
-            [x for x in cred_df["device_type"].dropna().astype(str).str.strip().tolist() if x]
+            set(
+                cred_df["device_type"]
+                .dropna()
+                .astype(str)
+                .str.strip()
+                .tolist()
+            )
         )
-        device_type_values = sorted(list(set(device_type_values)))
 
-# Fallback values (first time sheet is empty)
+# Fallback for first run
 if not location_values:
     location_values = ["HO", "Branch 1", "Branch 2", "Warehouse"]
 
 if not device_type_values:
     device_type_values = ["WiFi Router", "CCTV Camera", "NVR / DVR", "Switch"]
 
-# Always add Other at end
+# Always add trigger option
 location_options = location_values + ["Other"]
 device_type_options = device_type_values + ["Other"]
 
 # ─────────────────────────────────────────────
-# Submission form
+# Dynamic selectors (OUTSIDE FORM — IMPORTANT)
+# ─────────────────────────────────────────────
+st.subheader("📍 Device Location & Type")
+
+location_choice = st.selectbox("Location *", location_options)
+
+custom_location = ""
+if location_choice == "Other":
+    custom_location = st.text_input("Enter Location *")
+
+device_type_choice = st.selectbox("Device Type *", device_type_options)
+
+custom_device_type = ""
+if device_type_choice == "Other":
+    custom_device_type = st.text_input("Enter Device Type *")
+
+# ─────────────────────────────────────────────
+# Submission form (STATIC INPUTS ONLY)
 # ─────────────────────────────────────────────
 with st.form("cctv_wifi_form"):
     col1, col2 = st.columns(2)
 
     with col1:
-        selected_location = st.selectbox("Location *", options=location_options)
-        custom_location = ""
-        if selected_location == "Other":
-            custom_location = st.text_input("Enter Location *")
-
-        selected_device_type = st.selectbox("Device Type *", options=device_type_options)
-        custom_device_type = ""
-        if selected_device_type == "Other":
-            custom_device_type = st.text_input("Enter Device Type *")
-
-        ssid = st.text_input("SSID / Device Name")      # optional
-        ss_password = st.text_input("SSID Password")    # optional
+        ssid = st.text_input("SSID / Device Name")
+        ss_password = st.text_input("SSID Password")
 
     with col2:
         username = st.text_input("Username")
@@ -81,11 +101,20 @@ with st.form("cctv_wifi_form"):
     submit = st.form_submit_button("➕ Save Credential")
 
 # ─────────────────────────────────────────────
-# Submit logic (Other never saved)
+# Submit logic (RESOLVE FINAL VALUES)
 # ─────────────────────────────────────────────
 if submit:
-    final_location = custom_location.strip() if selected_location == "Other" else selected_location
-    final_device_type = custom_device_type.strip() if selected_device_type == "Other" else selected_device_type
+    final_location = (
+        custom_location.strip()
+        if location_choice == "Other"
+        else location_choice
+    )
+
+    final_device_type = (
+        custom_device_type.strip()
+        if device_type_choice == "Other"
+        else device_type_choice
+    )
 
     if not final_location or not final_device_type:
         st.error("Location and Device Type are required.")
@@ -94,24 +123,24 @@ if submit:
     append_row(
         SHEET_NAME,
         {
+            "location": final_location,
             "device_type": final_device_type,
             "username": username,
             "password": password,
             "ip_add": ip_add,
             "ssid": ssid,
             "ss_password": ss_password,
-            "location": final_location,
             "mac": mac,
             "remarks": remarks,
             "created_at": datetime.now().isoformat(),
-        },
+        }
     )
 
     st.success("CCTV / Wi-Fi credential saved successfully")
     st.rerun()
 
 # ─────────────────────────────────────────────
-# Table view + CSV
+# Table + CSV export
 # ─────────────────────────────────────────────
 st.divider()
 st.subheader("📋 Stored CCTV / Wi-Fi Credentials")
@@ -135,5 +164,5 @@ else:
         "⬇ Download CSV",
         data=display_df.to_csv(index=False).encode("utf-8"),
         file_name="cctv_wifi_credentials.csv",
-        mime="text/csv",
+        mime="text/csv"
     )
