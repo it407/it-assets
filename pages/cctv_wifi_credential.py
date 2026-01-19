@@ -56,8 +56,8 @@ with st.form("cctv_wifi_form"):
 # Submit logic (NO logic change)
 # ─────────────────────────────────────────────
 if submit:
-    if not location or not device_type or not ssid or not ss_password:
-        st.error("Location, Device Type, SSID, and SSID Password are required.")
+    if not location or not device_type:
+        st.error("Location, Device Type are required.")
         st.stop()
 
     append_row(
