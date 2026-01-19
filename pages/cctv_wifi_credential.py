@@ -90,10 +90,10 @@ with st.form("cctv_wifi_form"):
     with col1:
         ssid = st.text_input("SSID / Device Name")
         ss_password = st.text_input("SSID Password")
-
-    with col2:
         username = st.text_input("Username")
         password = st.text_input("Admin Password")
+
+    with col2:
         ip_add = st.text_input("IP Address")
         mac = st.text_input("MAC Address")
         remarks = st.text_area("Remarks")
