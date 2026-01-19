@@ -97,7 +97,7 @@ if result_df.empty:
 # ─────────────────────────────────────────────
 if "status" in result_df.columns:
     result_df = result_df[
-        result_df["status"].astype(str).str.lower() == "active"
+        result_df["status"].astype(str).str.lower() == "Active"
     ]
 
 if result_df.empty:
