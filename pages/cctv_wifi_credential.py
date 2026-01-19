@@ -2,23 +2,19 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 
-from utils.permissions import login_required, admin_only
-from utils.gsheets import read_sheet, append_row
 from utils.permissions import admin_only
-
-from utils.ui import apply_global_ui
-apply_global_ui()
-
-admin_only()
-
-from utils.navigation import apply_role_based_navigation
-apply_role_based_navigation()
-
+from utils.gsheets import read_sheet, append_row
+from utils.ui import back_to_home_button
 from utils.auth import logout
+
+# ─────────────────────────────────────────────
+# Security
+# ─────────────────────────────────────────────
+admin_only()
+back_to_home_button()
 logout()
 
-
-st.title("cctv wifi Credential")
+st.title("📡 CCTV / Wi-Fi Credentials")
 
 SHEET_NAME = "cctv_wifi_credential"
 
@@ -42,30 +38,36 @@ with st.form("cctv_wifi_form"):
             ["WiFi Router", "CCTV Camera", "NVR / DVR", "Switch", "Other"]
         )
         ssid = st.text_input("SSID / Device Name *")
+        ssid_password = st.text_input("SSID / Device Password *")
 
     with col2:
-        password = st.text_input("Password *")
-        ip_add = st.text_input("IP Address")   # ✅ SIMPLE
+        username = st.text_input("Username")
+        password = st.text_input("Admin Password")
+        ip_add = st.text_input("IP Address")
+        mac = st.text_input("MAC Address")
         remarks = st.text_area("Remarks")
 
     submit = st.form_submit_button("➕ Save Credential")
 
 # ─────────────────────────────────────────────
-# Submit logic (NO tricks, NO validation)
+# Submit logic
 # ─────────────────────────────────────────────
 if submit:
-    if not location or not device_type or not ssid or not password:
-        st.error("Location, Device Type, SSID, and Password are required.")
+    if not location or not device_type or not ssid or not ssid_password:
+        st.error("Location, Device Type, SSID and SSID Password are required.")
         st.stop()
 
     append_row(
         SHEET_NAME,
         {
-            "location": location,
             "device_type": device_type,
-            "ssid": ssid,
+            "username": username,
             "password": password,
-            "ip_add": ip_add,   # ✅ SAME AS NAME
+            "ip_add": ip_add,
+            "ssid": ssid,
+            "ssid_password": ssid_password,
+            "location": location,
+            "mac": mac,
             "remarks": remarks,
             "created_at": datetime.now().isoformat(),
         }
