@@ -2,6 +2,7 @@
 
 import streamlit as st
 import pandas as pd
+import duckdb
 
 from utils.navigation import apply_role_based_navigation
 from utils.permissions import login_required
@@ -10,8 +11,6 @@ from utils.export import export_csv
 from utils.constants import (
     ASSET_ASSIGNMENTS_SHEET,
     ASSETS_MASTER_SHEET,
-    SOFTWARE_ASSIGNMENTS_SHEET,
-    SOFTWARE_MASTER_SHEET,
     ROLE_ADMIN,
 )
 from utils.ui import apply_global_ui
@@ -126,91 +125,72 @@ else:
     export_csv(past_assets, "my_asset_history.csv")
 
 # ─────────────────────────────────────────────
-# LOAD SOFTWARE DATA (NEW)
-# ─────────────────────────────────────────────
-software_assign_df = read_sheet(SOFTWARE_ASSIGNMENTS_SHEET)
-software_master_df = read_sheet(SOFTWARE_MASTER_SHEET)
-
-for df in [software_assign_df, software_master_df]:
-    if not df.empty:
-        df.columns = df.columns.str.strip().str.lower()
-
-# ─────────────────────────────────────────────
-# STRICT software permission filter (NEW)
-# ─────────────────────────────────────────────
-if not is_admin and not software_assign_df.empty:
-    software_assign_df = software_assign_df[
-        software_assign_df["employee_id"] == employee_id
-    ]
-
-# ─────────────────────────────────────────────
-# Attach software name & link (READ-ONLY JOIN)
-# ─────────────────────────────────────────────
-if not software_assign_df.empty:
-    software_assign_df = software_assign_df.merge(
-        software_master_df[["soft_id", "soft_name", "links"]],
-        on="soft_id",
-        how="left"
-    )
-
-# ─────────────────────────────────────────────
-# Split current & history (NEW)
-# ─────────────────────────────────────────────
-current_software = software_assign_df[
-    software_assign_df["assignment_status"] == "Assigned"
-]
-
-past_software = software_assign_df[
-    software_assign_df["assignment_status"] == "Returned"
-]
-
-# ─────────────────────────────────────────────
-# SOFTWARE TABLES (ADDED ONLY)
+# MY SOFTWARE (ADDED SECTION ONLY)
 # ─────────────────────────────────────────────
 st.divider()
 st.title("My Software")
 
-# ───── Current Software ─────
-st.subheader("💻 Currently Assigned Software")
+software_assign_df = read_sheet("software_assignments")
+software_master_df = read_sheet("software_master")
+employee_df = read_sheet("employee_master")
 
-if current_software.empty:
-    st.info("No software assigned.")
+for df in [software_assign_df, software_master_df, employee_df]:
+    if not df.empty:
+        df.columns = df.columns.str.strip().str.lower()
+
+if software_assign_df.empty:
+    st.info("No software assignments found.")
 else:
-    st.dataframe(
-        current_software[
-            [
-                "soft_id",
-                "soft_name",
-                "assigned_on",
-                "links",
-            ]
-        ].sort_values("assigned_on", ascending=False),
-        use_container_width=True,
-        column_config={
-            "links": st.column_config.LinkColumn(
-                "Software Link",
-                display_text="Open"
-            )
-        }
-    )
-    export_csv(current_software, "my_current_software.csv")
+    # STRICT user filter (same as assets)
+    if not is_admin:
+        software_assign_df = software_assign_df[
+            software_assign_df["employee_id"] == employee_id
+        ]
 
-# ───── Software History ─────
-st.subheader("🕘 Software Assignment History")
+    con = duckdb.connect(database=":memory:")
+    con.register("software_assign", software_assign_df)
+    con.register("software_master", software_master_df)
+    con.register("employee", employee_df)
 
-if past_software.empty:
-    st.info("No software history.")
-else:
-    st.dataframe(
-        past_software[
-            [
-                "soft_id",
-                "soft_name",
-                "assigned_on",
-                "returned_on",
-                "return_reason",
-            ]
-        ].sort_values("returned_on", ascending=False),
-        use_container_width=True,
-    )
-    export_csv(past_software, "my_software_history.csv")
+    software_df = con.execute("""
+    SELECT
+        e.employee_id,
+        e.employee_name,
+        sm.soft_id,
+        sm.soft_name,
+        sm.links AS link,
+        e.department,
+        e.location,
+        s.assigned_on
+    FROM software_assign s
+    JOIN software_master sm ON s.soft_id = sm.soft_id
+    JOIN employee e ON s.employee_id = e.employee_id
+    WHERE s.assignment_status = 'Assigned'
+    """).df()
+
+    if software_df.empty:
+        st.info("No software assigned.")
+    else:
+        st.dataframe(
+            software_df[
+                [
+                    "employee_id",
+                    "employee_name",
+                    "soft_id",
+                    "soft_name",
+                    "department",
+                    "location",
+                    "assigned_on",
+                    "link",
+                ]
+            ].sort_values("assigned_on", ascending=False),
+            use_container_width=True,
+            column_config={
+                "link": st.column_config.LinkColumn(
+                    "Software Link",
+                    display_text="Open"
+                )
+            }
+        )
+
+        export_csv(software_df, "my_assigned_software.csv")
