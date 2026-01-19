@@ -2,19 +2,22 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 
-from utils.permissions import admin_only
+from utils.permissions import login_required, admin_only
 from utils.gsheets import read_sheet, append_row
-from utils.ui import back_to_home_button
-from utils.auth import logout
+from utils.permissions import admin_only
 
-# ─────────────────────────────────────────────
-# Security
-# ─────────────────────────────────────────────
+from utils.ui import apply_global_ui
+apply_global_ui()
+
 admin_only()
-back_to_home_button()
+
+from utils.navigation import apply_role_based_navigation
+apply_role_based_navigation()
+
+from utils.auth import logout
 logout()
 
-st.title("📡 CCTV / Wi-Fi Credentials")
+st.title("cctv wifi Credential")
 
 SHEET_NAME = "cctv_wifi_credential"
 
@@ -38,7 +41,7 @@ with st.form("cctv_wifi_form"):
             ["WiFi Router", "CCTV Camera", "NVR / DVR", "Switch", "Other"]
         )
         ssid = st.text_input("SSID / Device Name *")
-        ssid_password = st.text_input("SSID / Device Password *")
+        ss_password = st.text_input("SSID Password *")
 
     with col2:
         username = st.text_input("Username")
@@ -50,11 +53,11 @@ with st.form("cctv_wifi_form"):
     submit = st.form_submit_button("➕ Save Credential")
 
 # ─────────────────────────────────────────────
-# Submit logic
+# Submit logic (NO logic change)
 # ─────────────────────────────────────────────
 if submit:
-    if not location or not device_type or not ssid or not ssid_password:
-        st.error("Location, Device Type, SSID and SSID Password are required.")
+    if not location or not device_type or not ssid or not ss_password:
+        st.error("Location, Device Type, SSID, and SSID Password are required.")
         st.stop()
 
     append_row(
@@ -65,7 +68,7 @@ if submit:
             "password": password,
             "ip_add": ip_add,
             "ssid": ssid,
-            "ssid_password": ssid_password,
+            "ss_password": ss_password,
             "location": location,
             "mac": mac,
             "remarks": remarks,
