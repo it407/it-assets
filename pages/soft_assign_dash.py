@@ -20,10 +20,11 @@ st.title("💻 User-wise Assigned Software")
 # Load Data
 # ─────────────────────────────────────────────
 software_assign_df = read_sheet("software_assignments")
+software_master_df = read_sheet("software_master")
 employees_df = read_sheet("employee_master")
 
-# Normalize columns
-for df in [software_assign_df, employees_df]:
+# Normalize column names
+for df in [software_assign_df, software_master_df, employees_df]:
     if not df.empty:
         df.columns = df.columns.str.strip().str.lower()
 
@@ -33,26 +34,29 @@ if software_assign_df.empty:
     st.stop()
 
 # ─────────────────────────────────────────────
-# DuckDB Join (ONLY SOFTWARE)
+# DuckDB Join
 # ─────────────────────────────────────────────
 con = duckdb.connect(database=":memory:")
 
 con.register("software_assign", software_assign_df)
+con.register("software_master", software_master_df)
 con.register("employees", employees_df)
 
 query = """
 SELECT
     s.soft_id,
-    s.soft_name,
+    sm.soft_name,
     e.employee_id   AS user_id,
     e.employee_name AS user_name,
     e.location,
     e.department,
     s.assigned_on,
-    s.link
+    sm.links        AS link
 FROM software_assign s
 JOIN employees e
     ON s.employee_id = e.employee_id
+JOIN software_master sm
+    ON s.soft_id = sm.soft_id
 WHERE s.assignment_status = 'Assigned'
 """
 
